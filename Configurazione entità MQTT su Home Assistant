@@ -1,0 +1,78 @@
+mqtt:
+  binary_sensor:
+    - unique_id: "status_connection_myhome_gateway"
+      name: "MyHome Gateway"
+      state_topic: "connection/myhome/status"
+      value_template: "{{ value_json.gateway.state }}"
+      json_attributes_topic: "gateway/myhome/status"
+      json_attributes_template: "{{ value_json.attributes | tojson }}"
+      expire_after: 300
+      device_class: connectivity
+      
+  light:
+    # MYHOME BUS 0
+    - unique_id: "myhome_light_01"
+      name: "Luce 01 bus 0"
+      state_topic: "01/00/light/myhome/status"
+      command_topic: "01/00/light/myhome/set"
+      state_value_template: "{{ value_json.light.state }}"
+      json_attributes_topic: "01/00/light/myhome/status"
+      json_attributes_template: "{{ value_json.attributes | tojson }}"
+      
+    # MYHOME BUS 1
+    - unique_id: "myhome_light_0313#4#01"
+      name: "Luce 0313 bus 1"
+      state_topic: "0313/01/light/myhome/status"
+      command_topic: "0313/01/light/myhome/set"
+      state_value_template: "{{ value_json.light.state }}"
+      json_attributes_topic: "0313/01/light/myhome/status"
+      json_attributes_template: "{{ value_json.attributes | tojson }}"
+      
+    # MYHOME BUS 1
+    - unique_id: "myhome_light_20#4#01"
+      name: "Luce dimmer 20 bus 1"
+      state_topic: "20/01/light/myhome/status"
+      command_topic: "20/01/light/myhome/set"
+      brightness_state_topic: "20/01/light/myhome/status"
+      brightness_command_topic: "20/01/brightness/myhome/set"
+      state_value_template: "{{ value_json.light.state }}"
+      brightness_value_template: "{{ value_json.light.brightness }}"
+      json_attributes_topic: "20/01/light/myhome/status"
+      json_attributes_template: "{{ value_json.attributes | tojson }}"
+      on_command_type: 'brightness'      
+      
+  switch:
+    # MYHOME BUS 0
+    - unique_id: "myhome_light_0710"
+      name: "Presa comandata 0710 bus 0"
+      state_topic: "0710/00/light/myhome/status"
+      command_topic: "0710/00/17/light/myhome/set"
+      value_template: "{{ value_json.light.state }}"
+      json_attributes_topic: "0710/00/light/myhome/status"
+      json_attributes_template: "{{ value_json.attributes | tojson }}"
+      icon: mdi:power-socket-it
+      
+  fan:
+    # MYHOME BUS 1
+    - unique_id: "myhome_fan_08#4#01"
+      name: "Aspiratore 08 bus 1"
+      state_topic: "08/01/light/myhome/status"
+      command_topic: "08/01/light/myhome/set"
+      state_value_template: "{{ value_json.light.state }}"
+      json_attributes_topic: "08/01/light/myhome/status"
+      json_attributes_template: "{{ value_json.attributes | tojson }}"
+      
+  cover:
+    # MYHOME BUS 0
+    - unique_id: "myhome_cover_43"
+      name: "Tenda 43 bus 0"
+      state_topic: "43/00/cover/myhome/status"
+      command_topic: "43/00/cover/myhome/set"
+      value_template: "{{ value_json.cover.state }}"
+      json_attributes_topic: "43/00/cover/myhome/status"
+      json_attributes_template: "{{ value_json.attributes | tojson }}"
+      optimistic: true
+      
+      
+      
+      
