@@ -1,0 +1,430 @@
+[
+    {
+        "id": "2a4b09836ccc0a58",
+        "type": "subflow",
+        "name": "MyHome SCS",
+        "info": "",
+        "category": "Bticino MyHome",
+        "in": [
+            {
+                "x": 50,
+                "y": 190,
+                "wires": [
+                    {
+                        "id": "07c351eaa2415321"
+                    },
+                    {
+                        "id": "11e8f8f84255cff0"
+                    }
+                ]
+            }
+        ],
+        "out": [
+            {
+                "x": 960,
+                "y": 90,
+                "wires": [
+                    {
+                        "id": "1d620609b543933e",
+                        "port": 0
+                    },
+                    {
+                        "id": "ccc1ef91dc8782e5",
+                        "port": 0
+                    }
+                ]
+            },
+            {
+                "x": 950,
+                "y": 140,
+                "wires": [
+                    {
+                        "id": "a99e6b4802479714",
+                        "port": 0
+                    },
+                    {
+                        "id": "20963ea372783d75",
+                        "port": 0
+                    }
+                ]
+            }
+        ],
+        "env": [
+            {
+                "name": "watchdog",
+                "type": "bool",
+                "value": "true",
+                "ui": {
+                    "icon": "font-awesome/fa-heartbeat",
+                    "label": {
+                        "en-US": "Check the connection with the gateway"
+                    },
+                    "type": "checkbox"
+                }
+            },
+            {
+                "name": "debug_log",
+                "type": "bool",
+                "value": "true",
+                "ui": {
+                    "icon": "font-awesome/fa-bug",
+                    "label": {
+                        "en-US": "Debugging information"
+                    },
+                    "type": "checkbox"
+                }
+            },
+            {
+                "name": "debug_warn",
+                "type": "bool",
+                "value": "true",
+                "ui": {
+                    "icon": "font-awesome/fa-bug",
+                    "label": {
+                        "en-US": "Debugging warnig"
+                    },
+                    "type": "checkbox"
+                }
+            },
+            {
+                "name": "debug_error",
+                "type": "bool",
+                "value": "true",
+                "ui": {
+                    "icon": "font-awesome/fa-bug",
+                    "label": {
+                        "en-US": "Debugging error"
+                    },
+                    "type": "checkbox"
+                }
+            }
+        ],
+        "meta": {
+            "module": "node-red-myhome-scs",
+            "version": "2.5.0",
+            "author": "Bruno Leonardi <b.leonardi78@gmail.com>",
+            "desc": "MyHome SCS integration",
+            "keywords": "scs, myhome, bticino, legrand, own",
+            "license": "MIT"
+        },
+        "color": "#66B2FF",
+        "inputLabels": [
+            "MyHome e MQTT"
+        ],
+        "outputLabels": [
+            "MyHome",
+            "MQTT"
+        ],
+        "icon": "font-awesome/fa-star",
+        "status": {
+            "x": 920,
+            "y": 290,
+            "wires": [
+                {
+                    "id": "abcc0fda3dce3b7d",
+                    "port": 0
+                }
+            ]
+        }
+    },
+    {
+        "id": "6e41aa7e356920b9",
+        "type": "status",
+        "z": "2a4b09836ccc0a58",
+        "name": "Status node",
+        "scope": [
+            "20963ea372783d75",
+            "505197735eb78414",
+            "ccc1ef91dc8782e5",
+            "07c351eaa2415321"
+        ],
+        "x": 730,
+        "y": 290,
+        "wires": [
+            [
+                "abcc0fda3dce3b7d"
+            ]
+        ]
+    },
+    {
+        "id": "20963ea372783d75",
+        "type": "function",
+        "z": "2a4b09836ccc0a58",
+        "name": "OWN Read",
+        "func": "// AGGIORNATO IL 06/01/2023\n////////////////////////////////////////////////////////////////////////\n////////////////////////////////////////////////////////////////////////\n////////////////////////////////////////////////////////////////////////\n\n//messaggio non SCS\nif (msg.topic) return null\n\n////////////////////////////////////////////////////////////////////////\n////////////////////////////////////////////////////////////////////////\n////////////////////////////////////////////////////////////////////////\n\n//reset status node\nif (msg.payload == true) {\n    node.status({ fill: \"blue\", shape: \"ring\", text: \"Waiting data\" })\n    return null\n}\n\n////////////////////////////////////////////////////////////////////////\n////////////////////////////////////////////////////////////////////////\n////////////////////////////////////////////////////////////////////////\n\nvar MANUFACTURER = flow.get(\"manufacturer\")\nvar POWERED_BY = flow.get(\"powered_by\")\n\n////////////////////////////////////////////////////////////////////////\n////////////////////////////////////////////////////////////////////////\n////////////////////////////////////////////////////////////////////////\n\n//variabili\nconst UNDEFINED = env.get(\"undefined_value\")\nvar result_data = null\nvar Data = ''\nvar debug_text = null\n\n//openwebnet\nvar frame = null\nvar who = null\nvar who_name = null\nvar who_func = null\nvar what = null\nvar where = null\nvar where_table = null\nvar apl = null\nvar bus = null\nconst ACK = \"*#*1##\"\nconst NACK = \"*#*0##\"\nconst INTERFACE = \"#4#\"\n\n//gateway\nconst GATEWAY_ON = \"ON\"\n\n//light\nconst LIGHT_ON = \"ON\"\nconst LIGHT_OFF = \"OFF\"\nconst LIGHT_TOPIC = \"/light/myhome/status\"\nvar LIGHT_STATE = LIGHT_OFF\nvar LIGHT_BRIGHTNESS = 0\nvar LIGHT_FADE = 255\nvar LIGHT_DELAY = 0\nvar LIGHT_BLINKING = false\n\n//cover\nconst COVER_OPEN = \"opening\"\nconst COVER_CLOSE = \"closing\"\nconst COVER_STOP = \"stopped\"\nvar COVER_POSITION = 255\nconst COVER_TOPIC = \"/cover/myhome/status\"\n\n//climate\nvar CLIMATE_KNOB = 0\nconst CLIMATE_MODE_OFF = \"off\"\nconst CLIMATE_MODE_HEAT = \"heat\"\nconst CLIMATE_MODE_COOL = \"cool\"\nconst CLIMATE_MODE_AUTO = \"auto\"\nconst CLIMATE_FAN_ON = \"ON\"\nconst CLIMATE_FAN_OFF = \"OFF\"\nconst CLIMATE_FAN_PRESET_OFF = \"off\"\nconst CLIMATE_FAN_PRESET_LOW = \"low\"\nconst CLIMATE_FAN_PRESET_MEDIUM = \"medium\"\nconst CLIMATE_FAN_PRESET_HIGH = \"high\"\nconst CLIMATE_FAN_PRESET_AUTO = \"auto\"\nconst CLIMATE_FAN_PERCENTAGE_OFF = 0\nconst CLIMATE_FAN_PERCENTAGE_LOW = 1\nconst CLIMATE_FAN_PERCENTAGE_MEDIUM = 2\nconst CLIMATE_FAN_PERCENTAGE_HIGH = 3\nconst CLIMATE_FAN_PERCENTAGE_AUTO = 4\nconst CLIMATE_TEMPERATURE_TOPIC = \"/climate/temperature/myhome/status\"\nconst CLIMATE_SETPOINT_TOPIC = \"/climate/setpoint/myhome/status\"\nconst CLIMATE_MODE_TOPIC = \"/climate/mode/myhome/status\"\nconst CLIMATE_FAN_TOPIC = \"/climate/fan/myhome/status\"\n\n//contact\nconst CONTACT_ON = \"ON\"\nconst CONTACT_OFF = \"OFF\"\nconst CONTACT_TOPIC = \"/contact/myhome/status\"\n\n//button\nvar BUTTON_NUMBER = null\nconst BUTTON_PRESSED = \"PRESSED\"\nconst BUTTON_HOLD = \"HOLD\"\nconst BUTTON_RELEASED = \"RELEASED\"\nconst BUTTON_SLOW_RIGHT = \"SLOW_RIGHT\"\nconst BUTTON_SLOW_LEFT = \"SLOW_LEFT\"\nconst BUTTON_QUICK_RIGHT = \"QUICK_RIGHT\"\nconst BUTTON_QUICK_LEFT = \"QUICK_LEFT\"\nconst BUTTON_TOPIC = \"/button/myhome/status\"\n\n//scene\nconst SCENE_TOPIC = \"/scene/myhome/status\"\n\n////////////////////////////////////////////////////////////////////////\n//FUNCTION//////////////////////////////////////////////////////////////\n////////////////////////////////////////////////////////////////////////\n\n//assegna WHO e crea array FRAME dal payload\nfunction GetWho() {\n    try {\n        if (Data && Data.startsWith(\"*\") && Data != ACK && Data != NACK) {\n            frame = Data.substr(1).replace(\"##\", \"\")\n            frame = frame.split(\"*\")\n            who = frame[0].replace(\"#\", \"\")\n            who = parseInt(who)\n        }\n    } catch (err) {\n        debug_text = `GetWho Error: ${err.message} | ${Data}`\n        if (env.get(\"debug_error\")) { node.error(debug_text) }\n    }\n    return who\n}\n\n//assegna BUS\nfunction GetBus() {\n    try {\n        if (Data && Data.startsWith(\"*\") && Data != ACK && Data != NACK) {\n            bus = Data.indexOf(INTERFACE)\n            bus = bus + INTERFACE.length\n            bus = (bus > INTERFACE.length) ? Data.substr(bus, 2) : \"00\"\n        }\n    } catch (err) {\n        debug_text = `GetBus Error: ${err.message} | ${Data}`\n        if (env.get(\"debug_error\")) { node.error(debug_text) }\n    }\n    return bus\n}\n\n//assegna WHERE, APL e WHERE_TABLE\nfunction GetWhereTable() {\n    where = where || UNDEFINED\n    apl = (bus != \"00\") ? where.replace(\"#4#\" + bus, \"\") : where\n\n    if (who < 3) {\n        if (apl == \"0\") {\n            where_table = \"General\"\n        } else if (apl == \"00\" || apl == \"100\" || (apl.length == 1 && parseInt(apl) > 0 && parseInt(apl) < 10)) {\n            where_table = \"Area\"\n        } else if (apl.startsWith(\"#\")) {\n            where_table = \"Group\"\n        } else {\n            where_table = who_name.charAt(0).toUpperCase() + who_name.slice(1)\n        }\n    } else {\n        where_table = who_name.charAt(0).toUpperCase() + who_name.slice(1)\n    }\n\n    return where_table\n}\n\n//restituisce il giorno della settimana\nfunction GetDayOfWeek(dayofweek) {\n    dayofweek = parseInt(dayofweek)\n\n    if (dayofweek == 0) { dayofweek = \"Domenica\" }\n    if (dayofweek == 1) { dayofweek = \"Lunedì\" }\n    if (dayofweek == 2) { dayofweek = \"Martedì\" }\n    if (dayofweek == 3) { dayofweek = \"Mercoledì\" }\n    if (dayofweek == 4) { dayofweek = \"Giovedì\" }\n    if (dayofweek == 5) { dayofweek = \"Venerdì\" }\n    if (dayofweek == 6) { dayofweek = \"Sabato\" }\n\n    return (dayofweek <= 6) ? UNDEFINED : dayofweek\n}\n\n//restituisce il mese\nfunction GetMonth(month) {\n    month = parseInt(month)\n\n    if (month == 1) { month = \"Gennaio\" }\n    if (month == 2) { month = \"Febbraio\" }\n    if (month == 3) { month = \"Marzo\" }\n    if (month == 4) { month = \"Aprile\" }\n    if (month == 5) { month = \"Maggio\" }\n    if (month == 6) { month = \"Giugno\" }\n    if (month == 7) { month = \"Luglio\" }\n    if (month == 8) { month = \"Agosto\" }\n    if (month == 9) { month = \"Settembre\" }\n    if (month == 10) { month = \"Ottobre\" }\n    if (month == 11) { month = \"Novembre\" }\n    if (month == 12) { month = \"Dicembre\" }\n\n    return (month <= 12) ? UNDEFINED : month\n}\n\n//restituisce il GMT\nfunction GetTimeZone(gmt) {\n    gmt = (gmt.startsWith(\"0\")) ? \"GMT+\" + gmt.substr(1) : \"GMT-\" + gmt.substr(1)\n    return gmt\n}\n\n//restituisce il modello del gateway\nfunction GetGatewayModel(model) {\n    try {\n        model = parseInt(model)\n\n        switch (model) {\n            case 2:\n                return \"MHServer\"\n            case 4:\n                return \"MH200\"\n            case 6:\n                return \"F452\"\n            case 7:\n                return \"F452V\"\n            case 11:\n                return \"MHServer2\"\n            case 12:\n                return \"F452AV\"\n            case 13:\n                return \"H4684\"\n            case 15:\n                return \"F427 (Open-KNX)\"\n            case 16:\n                return \"F453\"\n            case 23:\n                return \"H4684\"\n            case 27:\n                return \"L4686SDK\"\n            case 44:\n                return \"MH200N\"\n            case 51:\n                return \"F454\"\n            case 200:\n                return \"F454 v2\"\n            default:\n                return `Unknown Model ${Data.substr(9).replace(\"##\", \"\")}`\n        }\n    } catch (err) {\n        return `Unknown Model ${Data.substr(9).replace(\"##\", \"\")}`\n    }\n}\n\n//restituisce il valore in gradi celsius\nfunction GetTemperature(temp) {\n    try {\n        let degrees = temp.substr(1, 2)\n        let dec_degree = temp.substr(3, 1)\n        degrees = parseInt(degrees)\n        dec_degree = parseInt(dec_degree)\n        temp = `${degrees}.${dec_degree}`\n        return parseFloat(temp)\n    } catch (err) {\n        return 0\n    }\n}\n\n//send light json\nfunction SendLight(TOPIC) {\n    let MSG = {}\n    MSG.payload = {}\n    MSG.payload.light = {}\n    MSG.payload.light.state = LIGHT_STATE\n    MSG.payload.light.brightness = (LIGHT_BRIGHTNESS == 0 && LIGHT_STATE == LIGHT_ON) ? 255 : Math.round(LIGHT_BRIGHTNESS * 2.55)\n    MSG.payload.attributes = {}\n    MSG.payload.attributes.manufacturer = MANUFACTURER\n    MSG.payload.attributes.powered_by = POWERED_BY\n    MSG.payload.attributes.own_function = who_func\n    MSG.payload.attributes.own_event = Data\n    MSG.payload.attributes.own_address = where\n    //extra info\n    MSG.payload.attributes.fade = LIGHT_FADE\n    MSG.payload.attributes.delay = LIGHT_DELAY\n    MSG.payload.attributes.blinking = LIGHT_BLINKING\n    MSG.payload.attributes.brightness = LIGHT_BRIGHTNESS\n    //conversione payload a JSON String\n    MSG.payload = JSON.stringify(MSG.payload)\n    //impostazioni MQTT\n    MSG.qos = 0\n    MSG.retain = false\n    MSG.topic = `${apl.replace(\"#\", \"G\")}/${bus}`\n    MSG.topic += (TOPIC.startsWith(\"/\")) ? TOPIC : `/${TOPIC}`\n    //invio\n    node.send(MSG)\n}\n\n//send automation json\nfunction SendCover(TOPIC) {\n    let MSG = {}\n    MSG.payload = {}\n    MSG.payload.cover = {}\n    MSG.payload.cover.state = result_data\n    MSG.payload.cover.position = COVER_POSITION\n    MSG.payload.attributes = {}\n    MSG.payload.attributes.manufacturer = MANUFACTURER\n    MSG.payload.attributes.powered_by = POWERED_BY\n    MSG.payload.attributes.own_function = who_func\n    MSG.payload.attributes.own_event = Data\n    MSG.payload.attributes.own_address = where\n    //extra info\n    MSG.payload.attributes.position = COVER_POSITION\n    //conversione payload a JSON String\n    MSG.payload = JSON.stringify(MSG.payload)\n    //impostazioni MQTT\n    MSG.qos = 0\n    MSG.retain = false\n    MSG.topic = `${apl.replace(\"#\", \"G\")}/${bus}`\n    MSG.topic += (TOPIC.startsWith(\"/\")) ? TOPIC : `/${TOPIC}`\n    //invio\n    node.send(MSG)\n}\n\n//send fan json\nfunction SendFan(TOPIC, STATE, PRESET, PERCENTAGE) {\n    let MSG = {}\n    MSG.payload = {}\n    MSG.payload.fan = {}\n    MSG.payload.fan.state = STATE\n    MSG.payload.fan.preset = PRESET\n    MSG.payload.fan.percentage = PERCENTAGE\n    MSG.payload.attributes = {}\n    MSG.payload.attributes.manufacturer = MANUFACTURER\n    MSG.payload.attributes.powered_by = POWERED_BY\n    MSG.payload.attributes.own_function = who_func\n    MSG.payload.attributes.own_event = Data\n    MSG.payload.attributes.own_address = where\n    //conversione payload a JSON String\n    MSG.payload = JSON.stringify(MSG.payload)\n    //impostazioni MQTT\n    MSG.qos = 0\n    MSG.retain = false\n    MSG.topic = `${apl.replace(\"#\", \"G\")}/${bus}`\n    MSG.topic += (TOPIC.startsWith(\"/\")) ? TOPIC : `/${TOPIC}`\n    //invio\n    node.send(MSG)\n}\n\n//send thermostat temperature json\nfunction SendThermostatTemperature(TOPIC) {\n    let MSG = {}\n    MSG.payload = {}\n    MSG.payload.thermostat = {}\n    MSG.payload.thermostat.temperature = result_data\n    MSG.payload.attributes = {}\n    MSG.payload.attributes.manufacturer = MANUFACTURER\n    MSG.payload.attributes.powered_by = POWERED_BY\n    MSG.payload.attributes.own_function = who_func\n    MSG.payload.attributes.own_event = Data\n    MSG.payload.attributes.own_address = where\n    //conversione payload a JSON String\n    MSG.payload = JSON.stringify(MSG.payload)\n    //impostazioni MQTT\n    MSG.qos = 0\n    MSG.retain = true\n    MSG.topic = `${apl.replace(\"#\", \"G\")}/${bus}`\n    MSG.topic += (TOPIC.startsWith(\"/\")) ? TOPIC : `/${TOPIC}`\n    //invio\n    node.send(MSG)\n}\n\n//send thermostat setpoint json\nfunction SendThermostatSetpoint(TOPIC) {\n    let MSG = {}\n    MSG.payload = {}\n    MSG.payload.thermostat = {}\n    MSG.payload.thermostat.setpoint = result_data\n    MSG.payload.attributes = {}\n    MSG.payload.attributes.manufacturer = MANUFACTURER\n    MSG.payload.attributes.powered_by = POWERED_BY\n    MSG.payload.attributes.own_function = who_func\n    MSG.payload.attributes.own_event = Data\n    MSG.payload.attributes.own_address = where\n    //conversione payload a JSON String\n    MSG.payload = JSON.stringify(MSG.payload)\n    //impostazioni MQTT\n    MSG.qos = 0\n    MSG.retain = true\n    MSG.topic = `${apl.replace(\"#\", \"G\")}/${bus}`\n    MSG.topic += (TOPIC.startsWith(\"/\")) ? TOPIC : `/${TOPIC}`\n    //invio\n    node.send(MSG)\n}\n\n//send thermostat mode json\nfunction SendThermostatModel(TOPIC) {\n    let MSG = {}\n    MSG.payload = {}\n    MSG.payload.thermostat = {}\n    MSG.payload.thermostat.mode = result_data\n    MSG.payload.attributes = {}\n    MSG.payload.attributes.manufacturer = MANUFACTURER\n    MSG.payload.attributes.powered_by = POWERED_BY\n    MSG.payload.attributes.own_function = who_func\n    MSG.payload.attributes.own_event = Data\n    MSG.payload.attributes.own_address = where\n    //conversione payload a JSON String\n    MSG.payload = JSON.stringify(MSG.payload)\n    //impostazioni MQTT\n    MSG.qos = 0\n    MSG.retain = false\n    MSG.topic = `${apl.replace(\"#\", \"G\")}/${bus}`\n    MSG.topic += (TOPIC.startsWith(\"/\")) ? TOPIC : `/${TOPIC}`\n    //invio\n    node.send(MSG)\n}\n\n//send gateway json\nfunction SendGatewayState() {\n    let MSG = {}\n    MSG.payload = {}\n    MSG.payload.gateway = {}\n    MSG.payload.gateway.state = GATEWAY_ON\n    MSG.payload.attributes = {}\n    MSG.payload.attributes.manufacturer = MANUFACTURER\n    MSG.payload.attributes.powered_by = POWERED_BY\n    MSG.payload.attributes.own_function = who_func\n    MSG.payload.attributes.own_event = Data\n    //extra info\n    MSG.payload.attributes.info = result_data\n    //conversione payload a JSON String\n    MSG.payload = JSON.stringify(MSG.payload)\n    //impostazioni MQTT\n    MSG.qos = 0\n    MSG.retain = true\n    MSG.topic = \"gateway/myhome/status\"\n    //invio\n    node.send(MSG)\n}\n\n//send button json\nfunction SendButton(TOPIC) {\n    let MSG = {}\n    MSG.payload = {}\n    MSG.payload.button = {}\n    MSG.payload.button.state = result_data\n    MSG.payload.attributes = {}\n    MSG.payload.attributes.manufacturer = MANUFACTURER\n    MSG.payload.attributes.powered_by = POWERED_BY\n    MSG.payload.attributes.own_function = who_func\n    MSG.payload.attributes.own_event = Data\n    //extra info\n    MSG.payload.attributes.button_number = BUTTON_NUMBER\n    //conversione payload a JSON String\n    MSG.payload = JSON.stringify(MSG.payload)\n    //impostazioni MQTT\n    MSG.qos = 0\n    MSG.retain = true\n    MSG.topic = `${BUTTON_NUMBER}/${apl.replace(\"#\", \"G\")}/${bus}`\n    MSG.topic += (TOPIC.startsWith(\"/\")) ? TOPIC : `/${TOPIC}`\n    //invio\n    node.send(MSG)\n}\n\n//send contact json\nfunction SendContact(TOPIC) {\n    let MSG = {}\n    MSG.payload = {}\n    MSG.payload.contact = {}\n    MSG.payload.contact.state = result_data\n    MSG.payload.attributes = {}\n    MSG.payload.attributes.manufacturer = MANUFACTURER\n    MSG.payload.attributes.powered_by = POWERED_BY\n    MSG.payload.attributes.own_function = who_func\n    MSG.payload.attributes.own_event = Data\n    //conversione payload a JSON String\n    MSG.payload = JSON.stringify(MSG.payload)\n    //impostazioni MQTT\n    MSG.qos = 0\n    MSG.retain = true\n    MSG.topic = `${apl.replace(\"#\", \"G\")}/${bus}`\n    MSG.topic += (TOPIC.startsWith(\"/\")) ? TOPIC : `/${TOPIC}`\n    //invio\n    node.send(MSG)\n}\n\n//send scene json\nfunction SendScene(TOPIC) {\n    let MSG = {}\n    MSG.payload = {}\n    MSG.payload.scene = {}\n    MSG.payload.scene.state = result_data\n    MSG.payload.attributes = {}\n    MSG.payload.attributes.manufacturer = MANUFACTURER\n    MSG.payload.attributes.powered_by = POWERED_BY\n    MSG.payload.attributes.own_function = who_func\n    MSG.payload.attributes.own_event = Data\n    //extra info\n    MSG.payload.attributes.started = (what == 1) ? true : false\n    MSG.payload.attributes.stopped = (what == 2) ? true : false\n    MSG.payload.attributes.enabled = (what == 3) ? true : false\n    MSG.payload.attributes.disabled = (what == 4) ? true : false\n    //conversione payload a JSON String\n    MSG.payload = JSON.stringify(MSG.payload)\n    //impostazioni MQTT\n    MSG.qos = 0\n    MSG.retain = false\n    MSG.topic = `${apl.replace(\"#\", \"G\")}/${bus}`\n    MSG.topic += (TOPIC.startsWith(\"/\")) ? TOPIC : `/${TOPIC}`\n    //invio\n    node.send(MSG)\n}\n\n//analizza il messaggio\nfunction ProcessEvent() {\n    who = GetWho()\n    bus = GetBus()\n\n    //light function\n    if (who == 1) {\n        //descrizione della funzione\n        who_func = \"Lighting Functions\"\n        //nome oggetto della funzione\n        who_name = \"Light\"\n\n        if (frame[0] == \"1\") {\n            //Command translation - What = 1000\n            //*1*1000#<what>*<where>##\n            if (Data.startsWith(\"*1*1000#\")) {\n                what = frame[1].replace(\"1000#\", \"\")\n                what = parseInt(what)\n            } else {\n                what = parseInt(frame[1])\n            }\n\n            //Required Only ON Light - Dimension = 3\n            //*1*<status>*12<where>## (only if some lights is ON, status=1)\n            //where = (frame[2].startsWith(\"12\") && frame[2].toString.length > 4) ? frame[2].substr(2) : frame[2]\n            //where = (where.startsWith(\"#4#\") || where == null || where == \"\") ? frame[2] : where\n            where = frame[2]\n            where_table = GetWhereTable()\n\n            if (what == 1) {\n                //luce on\n                result_data = LIGHT_ON\n                LIGHT_STATE = result_data\n                LIGHT_BRIGHTNESS = 100\n                debug_text = `${where_table} ${where} is ${LIGHT_STATE}`\n            } else if (what >= 2 && what <= 10) {\n                //dimmer level10\n                result_data = what * 10\n                LIGHT_STATE = (result_data == 0) ? LIGHT_OFF : LIGHT_ON\n                LIGHT_BRIGHTNESS = result_data\n                debug_text = `${where_table} ${where} is ${LIGHT_STATE}`\n                debug_text += (LIGHT_BRIGHTNESS != 0) ? ` at ${LIGHT_BRIGHTNESS} %` : \"\"\n            } else if (what >= 11 && what <= 18) {\n                //luce temporizzata                    \n                if (what == 11) { result_data = 60 }\n                if (what == 12) { result_data = 120 }\n                if (what == 13) { result_data = 180 }\n                if (what == 14) { result_data = 240 }\n                if (what == 15) { result_data = 300 }\n                if (what == 16) { result_data = 900 }\n                if (what == 17) { result_data = 30 }\n                if (what == 18) { result_data = 0.5 }\n\n                if (result_data) {\n                    LIGHT_STATE = LIGHT_ON\n                    LIGHT_BRIGHTNESS = 100\n                    LIGHT_DELAY = result_data\n                    debug_text = `${where_table} ${where} is on for ${LIGHT_DELAY} seconds`\n                } else {\n                    result_data = UNDEFINED\n                    debug_text = `Unknown ${who_func} for event ${Data}`\n                }\n            } else if (what >= 20 && what <= 29) {\n                //luce lampeggiante\n                result_data = LIGHT_ON\n                LIGHT_STATE = result_data\n                LIGHT_BRIGHTNESS = 100\n                LIGHT_BLINKING = true\n                debug_text = `${where_table} ${where} is ${LIGHT_STATE} flashing`\n            } else if (what == 0) {\n                //luce off\n                result_data = LIGHT_OFF\n                LIGHT_STATE = result_data\n                LIGHT_BRIGHTNESS = 0\n                debug_text = `${where_table} ${where} is ${LIGHT_STATE}`\n            } else {\n                result_data = UNDEFINED\n                debug_text = `Unknown ${who_func} for event ${Data}`\n                if (env.get(\"debug_warn\")) { node.warn(debug_text) }\n            }\n        } else if (frame[0] == \"#1\") {\n            what = frame[2]\n            where = frame[1]\n            where_table = GetWhereTable()\n\n            if (what == \"1\" || what == \"#2\" || what == \"4\") {\n                //dimmer Level100                                        \n                result_data = parseInt(frame[3]) - 100\n                LIGHT_STATE = (result_data == 0) ? LIGHT_OFF : LIGHT_ON\n                LIGHT_BRIGHTNESS = result_data\n                LIGHT_FADE = parseInt(frame[4])\n                debug_text = `${where_table} ${where} is ${LIGHT_STATE}`\n                debug_text += (result_data != 0) ? ` at ${result_data} %` : \"\"\n            } else if (what == \"2\") {\n                //luce on per il tempo impostato\n                result_data = (parseInt(frame[3]) * 3600) + (parseInt(frame[4]) * 60) + parseInt(frame[5])\n\n                if (result_data == 0) {\n                    LIGHT_STATE = LIGHT_OFF\n                    LIGHT_BRIGHTNESS = 0\n                    LIGHT_DELAY = result_data\n                    debug_text = `${where_table} ${where} is ${LIGHT_STATE}`\n                } else {\n                    LIGHT_STATE = LIGHT_ON\n                    LIGHT_BRIGHTNESS = 100\n                    LIGHT_DELAY = result_data\n                    debug_text = `${where_table} ${where} is ${LIGHT_STATE} for ${LIGHT_DELAY} seconds`\n                }\n            } else if (what == \"8\" || what == \"9\" || what == \"#9\") {\n                //ore lavoro della luce\n                result_data = UNDEFINED\n                LIGHT_DELAY = parseInt(frame[3])\n                debug_text = `${where_table} ${where} worked ${LIGHT_DELAY} hours`\n            } else {\n                result_data = UNDEFINED\n                debug_text = `Unknown ${who_func} for event ${Data}`\n            }\n        } else {\n            result_data = UNDEFINED\n            debug_text = `Unknown ${who_func} for event ${Data}`\n        }\n\n        if (result_data && result_data != UNDEFINED) {\n            SendLight(LIGHT_TOPIC)\n        }\n\n        return null\n    }\n\n    //cover function\n    if (who == 2) {\n        //descrizione della funzione\n        who_func = \"Automation Functions\"\n        //nome oggetto della funzione\n        who_name = \"Cover\"\n        where = frame[2]\n\n        if (Data == \"*2*1000#0##\" || Data.startsWith(\"*2*1000#0*\")) {\n            what = 0\n            where = (Data == \"*2*1000#0##\") ? \"1000\" : where\n        } else if (Data == \"*2*1000#1##\" || Data.startsWith(\"*2*1000#1*\")) {\n            what = 1\n            where = (Data == \"*2*1000#1##\") ? \"1000\" : where\n        } else if (Data == \"*2*1000#2##\" || Data.startsWith(\"*2*1000#2*\")) {\n            what = 2\n            where = (Data == \"*2*1000#2##\") ? \"1000\" : where\n        } else if (frame.length > 5) {\n            what = parseInt(frame[2])\n            where = frame[1]\n            COVER_POSITION = parseInt(frame[4])\n        } else {\n            what = parseInt(frame[1])\n        }\n\n        where_table = GetWhereTable()\n\n        if (what == 0 || what == 10 || Data.startsWith(\"*2*1000#10#\") || Data.startsWith(\"*2*10#\")) {\n            result_data = COVER_STOP\n        } else if (what == 1 || what == 11 || what == 13 || Data.startsWith(\"*2*1000#11#\") || Data.startsWith(\"*2*11#\")) {\n            result_data = COVER_OPEN\n        } else if (what == 2 || what == 12 || what == 14 || Data.startsWith(\"*2*1000#12#\") || Data.startsWith(\"*2*12#\")) {\n            result_data = COVER_CLOSE\n        }\n\n        if (result_data) {\n            SendCover(COVER_TOPIC)\n            debug_text = `${where_table} ${where} is ${result_data}`\n            debug_text += (COVER_POSITION != 255) ? ` at ${COVER_POSITION} %` : \"\"\n        } else {\n            result_data = UNDEFINED\n            debug_text = `Unknown ${who_func} for event ${Data}`\n        }\n\n        return null\n    }\n\n    //climate controls function\n    if (who == 4) {\n        //descrizione della funzione\n        who_func = \"Temperature Controls Functions\"\n        //nome oggetto della funzione\n        who_name = \"Climate\"\n\n        if (Data.startsWith(\"*#4*\")) {\n            what = UNDEFINED\n            where = frame[1]\n\n            if (parseInt(frame[2]) == 0) {\n                // Measures Temperature\n                who_name += \" Temperature\"\n                where_table = GetWhereTable()\n                result_data = GetTemperature(frame[3])\n                debug_text = `${where_table} zone ${where} is ${result_data}`\n                SendThermostatTemperature(CLIMATE_TEMPERATURE_TOPIC)\n            } else if (parseInt(frame[2]) == 11) {\n                // Fan coil Speed\n                who_name += \" Fancoil\"\n                where_table = GetWhereTable()\n                result_data = parseInt(frame[3])\n\n                if (result_data == 0) {\n                    result_data = CLIMATE_FAN_PRESET_AUTO\n                    SendFan(CLIMATE_FAN_TOPIC, CLIMATE_FAN_ON, result_data, CLIMATE_FAN_PERCENTAGE_AUTO)\n                } else if (result_data == 1) {\n                    result_data = CLIMATE_FAN_PRESET_LOW\n                    SendFan(CLIMATE_FAN_TOPIC, CLIMATE_FAN_ON, result_data, CLIMATE_FAN_PERCENTAGE_LOW)\n                } else if (result_data == 2) {\n                    result_data = CLIMATE_FAN_PRESET_MEDIUM\n                    SendFan(CLIMATE_FAN_TOPIC, CLIMATE_FAN_ON, result_data, CLIMATE_FAN_PERCENTAGE_MEDIUM)\n                } else if (result_data == 3) {\n                    result_data = CLIMATE_FAN_PRESET_HIGH\n                    SendFan(CLIMATE_FAN_TOPIC, CLIMATE_FAN_ON, result_data, CLIMATE_FAN_PERCENTAGE_HIGH)\n                } else if (result_data == 15) {\n                    result_data = CLIMATE_FAN_PRESET_OFF\n                    SendFan(CLIMATE_FAN_TOPIC, CLIMATE_FAN_OFF, result_data, CLIMATE_FAN_PERCENTAGE_OFF)\n                } else {\n                    result_data = UNDEFINED\n                    debug_text = `Unknown ${who_func} for event ${Data}`\n                    return null\n                }\n\n                debug_text = `${where_table} zone ${where} set to mode ${result_data}`\n            } else if (parseInt(frame[2]) == 12 || parseInt(frame[2]) == 14) {\n                //Complete probe status\n                who_name += \" Setpoint\"\n                where_table = GetWhereTable()\n                result_data = GetTemperature(frame[3])\n                debug_text = `${where_table} zone ${where} set ${result_data}`\n                SendThermostatSetpoint(CLIMATE_SETPOINT_TOPIC)\n            } else {\n                result_data = UNDEFINED\n                debug_text = `Unknown ${who_func} for event ${Data}`\n            }\n        } else if (Data.startsWith(\"*4*\")) {\n            what = parseInt(frame[1])\n            where = frame[2]\n\n            if (what == 0 || what == 210 || what == 211 || what == 215) {\n                //Conditioning Mode\n                who_name += \" Conditioning Mode\"\n                where_table = GetWhereTable()\n                result_data = CLIMATE_MODE_COOL\n                debug_text = `${where_table} zone ${where} is set to ${result_data}`\n                SendThermostatModel(CLIMATE_MODE_TOPIC)\n            } else if (what == 1 || what == 110 || what == 111 || what == 115) {\n                //Heating Mode\n                who_name += \" Heating Mode\"\n                where_table = GetWhereTable()\n                result_data = CLIMATE_MODE_HEAT\n                debug_text = `${where_table} zone ${where} is set to ${result_data}`\n                SendThermostatModel(CLIMATE_MODE_TOPIC)\n            } else if (what == 103 || what == 203 || what == 303 || what == 102 || what == 202 || what == 302) {\n                //Off Mode\n                who_name += \" Off Mode\"\n                where_table = GetWhereTable()\n                result_data = CLIMATE_MODE_OFF\n                debug_text = `${where_table} zone ${where} is set to ${result_data}`\n                SendThermostatModel(CLIMATE_MODE_TOPIC)\n            } else if (what == 301 || what == 311 || what == 315) {\n                //Auto Mode\n                who_name += \" Auto Mode\"\n                where_table = GetWhereTable()\n                result_data = CLIMATE_MODE_AUTO\n                debug_text = `${where_table} zone ${where} is set to ${result_data}`\n                SendThermostatModel(CLIMATE_MODE_TOPIC)\n            } else if (what == 20 || what == 21) {\n                //Remote Control\n                who_name += \" Remote Control\"\n                where_table = GetWhereTable()\n                result_data = UNDEFINED\n                debug_text = `${where_table} zone ${where} is `\n                debug_text += (what == 20) ? \"disable\" : \"enable\"\n            } else if ((what >= 2101 && what <= 2103) || (what >= 2201 && what <= 2216)) {\n                //Conditioning Mode\n                who_name += \" Conditioning Mode\"\n                where_table = GetWhereTable()\n                result_data = CLIMATE_MODE_COOL\n                debug_text = `${where_table} zone ${where} is set to ${result_data}`\n                SendThermostatModel(CLIMATE_MODE_TOPIC)\n            } else if ((what >= 2101 && what <= 2103) || (what >= 2201 && what <= 2216)) {\n                //Heating Mode\n                who_name += \" Heating Mode\"\n                where_table = GetWhereTable()\n                result_data = CLIMATE_MODE_HEAT\n                debug_text = `${where_table} zone ${where} is set to ${result_data}`\n                SendThermostatModel(CLIMATE_MODE_TOPIC)\n            } else if ((what >= 23001 && what <= 23255) || (what >= 13001 && what <= 13255)) {\n                //Auto Mode\n                who_name += \" Auto Mode\"\n                where_table = GetWhereTable()\n                result_data = CLIMATE_MODE_AUTO\n                debug_text = `${where_table} zone ${where} is set to ${result_data}`\n                SendThermostatModel(CLIMATE_MODE_TOPIC)\n            } else {\n                result_data = UNDEFINED\n                debug_text = `Unknown ${who_func} for event ${Data}`\n            }\n        } else {\n            result_data = UNDEFINED\n            debug_text = `Unknown ${who_func} for event ${Data}`\n        }\n\n        return null\n    }\n\n    //gateway function\n    if (who == 13) {\n        //descrizione della funzione\n        who_func = \"Gateway\"\n        //nome oggetto della funzione\n        who_name = \"Gateway\"\n        what = parseInt(frame[2])\n\n        if (what == 0 || frame[2] == \"#0\") {\n            who_func += \" Time\"\n            where_table = GetWhereTable()\n            result_data = frame[3] + \":\" + frame[4] + \":\" + frame[5] + \" \" + GetTimeZone(frame[6])\n            debug_text = `${who_func} is ${result_data}`\n            SendGatewayState()\n        } else if (what == 1 || frame[2] == \"#1\") {\n            who_func += \" Date\"\n            where_table = GetWhereTable()\n            result_data = GetDayOfWeek(frame[3]) + \", \" + frame[4] + \" \" + GetMonth(frame[5]) + \" \" + frame[6]\n            debug_text = `${who_func} is ${result_data}`\n            SendGatewayState()\n        } else if (what == 10 || what == 50) {\n            who_func += \" Ip Address\"\n            where_table = GetWhereTable()\n            result_data = frame[3] + \".\" + frame[4] + \".\" + frame[5] + \".\" + frame[6]\n            debug_text = `${who_func} is ${result_data}`\n            SendGatewayState()\n        } else if (what == 11) {\n            who_func += \" Subnet\"\n            where_table = GetWhereTable()\n            result_data = frame[3] + \".\" + frame[4] + \".\" + frame[5] + \".\" + frame[6]\n            debug_text = `${who_func} is ${result_data}`\n            SendGatewayState()\n        } else if (what == 12) {\n            who_func += \" Mac\"\n            where_table = GetWhereTable()\n            result_data = parseInt(frame[3]).toString(16)\n            result_data = (result_data.length == 1) ? (\"0\" + result_data + \":\") : result_data + \":\"\n\n            let mac\n            for (let i = 4; i < 9; i++) {\n                mac = parseInt(frame[i]).toString(16)\n                result_data += (mac.length == 1) ? (\"0\" + mac) : mac\n                result_data += (i != 8) ? \":\" : \"\"\n            }\n\n            debug_text = `${who_func} is ${result_data}`\n            SendGatewayState()\n        } else if (what == 15) {\n            who_func += \" Model\"\n            where_table = GetWhereTable()\n            result_data = GetGatewayModel(frame[3])\n            debug_text = `${who_func} is ${result_data}`\n            SendGatewayState()\n        } else if (what == 16) {\n            who_func += \" Firmware\"\n            where_table = GetWhereTable()\n            result_data = \"ver. \" + frame[3] + \" rel. \" + frame[4] + \" build \" + frame[5]\n            debug_text = `${who_func} is ${result_data}`\n            SendGatewayState()\n        } else if (what == 19) {\n            who_func += \" Uptime\"\n            where_table = GetWhereTable()\n            result_data = frame[3] + \":\" + frame[4] + \":\" + frame[5] + \":\" + frame[6]\n            debug_text = `${who_func} is ${result_data}`\n            SendGatewayState()\n        } else if (what == 22 || frame[2] == \"#22\") {\n            who_func += \" Date time\"\n            where_table = GetWhereTable()\n            result_data = frame[8] + \"/\" + frame[9] + \"/\" + frame[10] + \" \" + frame[3] + \":\" + frame[4] + \":\" + frame[5] + \" \" + GetTimeZone(frame[6])\n            debug_text = `${who_func} is ${result_data}`\n            SendGatewayState()\n        } else if (what == 23) {\n            who_func += \" Kernel\"\n            where_table = GetWhereTable()\n            result_data = \"ver. \" + frame[3] + \" rel. \" + frame[4] + \" build \" + frame[5]\n            debug_text = `${who_func} is ${result_data}`\n            SendGatewayState()\n        } else if (what == 24) {\n            who_func += \" Distribution\"\n            where_table = GetWhereTable()\n            result_data = \"ver. \" + frame[3] + \" rel. \" + frame[4] + \" build \" + frame[5]\n            debug_text = `${who_func} version is ${result_data}`\n            SendGatewayState()\n        } else if (what == 51) {\n            who_func += \" DNS 1\"\n            where_table = GetWhereTable()\n            result_data = frame[3] + \".\" + frame[4] + \".\" + frame[5] + \".\" + frame[6]\n            debug_text = `${who_func} dns 1 is ${result_data}`\n            SendGatewayState()\n        } else if (what == 52) {\n            who_func += \" DNS 2\"\n            where_table = GetWhereTable()\n            result_data = frame[3] + \".\" + frame[4] + \".\" + frame[5] + \".\" + frame[6]\n            debug_text = `${who_func} is ${result_data}`\n            SendGatewayState()\n        } else {\n            result_data = UNDEFINED\n            debug_text = `Unknown ${who_func} for event ${Data}`\n        }\n\n        return null\n    }\n\n    //cen function\n    if (who == 15) {\n        //descrizione della funzione\n        who_func = \"CEN Functions\"\n        //nome oggetto della funzione\n        who_name = \"Button\"\n        //numero del pulsante [00-31]#parametro\n        BUTTON_NUMBER = parseInt(frame[1].substr(0, 2))\n        what = frame[1]\n        where = frame[2]\n        where_table = GetWhereTable()\n\n        if (frame[1].indexOf(\"#\") == -1) {\n            //il pulsante è stato premuto\n            result_data = BUTTON_PRESSED\n            debug_text = `${where_table} ${BUTTON_NUMBER} with address ${where} has pressed`\n        } else if (frame[1].endsWith(\"#1\") || frame[1].endsWith(\"#2\")) {\n            //il pulsante è stato rilasciato\n            result_data = BUTTON_RELEASED\n            debug_text = `${where_table} ${BUTTON_NUMBER} with address ${where} has released`\n        } else if (frame[1].endsWith(\"#3\")) {\n            //il pulsante è mantenuto premuto\n            result_data = BUTTON_HOLD\n            debug_text = `${where_table} ${BUTTON_NUMBER} with address ${where} is kept pressed`\n        } else {\n            result_data = UNDEFINED\n            debug_text = `Unknown ${who_func} for event ${Data}`\n        }\n\n        if (result_data != UNDEFINED) {\n            SendButton(BUTTON_TOPIC)\n        }\n\n        return null\n    }\n\n    //scene function\n    if (who == 17) {\n        //descrizione della funzione\n        who_func = \"Scene Programmer Gateway Functions\"\n        //nome oggetto della funzione\n        who_name = \"Scene\"\n        what = frame[1]\n        where = frame[2]\n        where_table = GetWhereTable()\n\n        if (what == 1) {\n            result_data = \"STARTED\"\n        } else if (what == 2) {\n            result_data = \"STOPPED\"\n        } else if (what == 3) {\n            result_data = \"ENABLED\"\n        } else if (what == 4) {\n            result_data = \"DISABLED\"\n        } else {\n            result_data = UNDEFINED\n        }\n\n        debug_text = (result_data || result_data != UNDEFINED) ? `${where_table} number ${where} is ${result_data}` : `Unknown ${who_func} for event ${Data}`\n\n        if (result_data != UNDEFINED) {\n            SendScene(SCENE_TOPIC)\n        }\n\n        return null\n    }\n\n    //contact and cen+ function\n    if (who == 25) {\n        //descrizione della funzione\n        who_func = \"Dry Contact and CEN Plus\"\n        //nome oggetto della funzione\n        who_name = \"Button\"\n        //richiesta stato per dry contact\n        //numero del pulsante #[0-31]\n        BUTTON_NUMBER = parseInt(frame[1].substr(3))\n        what = frame[1]\n        where = frame[2].substr(1)\n        where_table = GetWhereTable()\n\n        if (Data.startsWith(\"*25*31#\")) {\n            //il contatto è chiuso\n            who_name = \"contact\"\n            result_data = CONTACT_ON\n            debug_text = `${where_table} with address ${where} is closed`\n            SendContact(CONTACT_TOPIC)\n        } else if (Data.startsWith(\"*25*32#\")) {\n            //il contatto è aperto\n            who_name = \"contact\"\n            result_data = CONTACT_OFF\n            debug_text = `${where_table} with address ${where} is open`\n            SendContact(CONTACT_TOPIC)\n        } else if (Data.startsWith(\"*25*21#\" || Data.startsWith(\"*25*22#\"))) {\n            //il pulsante è stato premuto\n            result_data = BUTTON_PRESSED\n            debug_text = `${where_table} ${BUTTON_NUMBER} with address ${where} has pressed`\n            SendButton(BUTTON_TOPIC)\n        } else if (Data.startsWith(\"*25*23#\")) {\n            //il pulsante è mantenuto premuto\n            result_data = BUTTON_HOLD\n            debug_text = `${where_table} ${BUTTON_NUMBER} with address ${where} is kept pressed`\n            SendButton(BUTTON_TOPIC)\n        } else if (Data.startsWith(\"*25*24#\")) {\n            //il pulsante è stato rilasciato\n            result_data = BUTTON_RELEASED\n            debug_text = `${where_table} ${BUTTON_NUMBER} with address ${where} has release after hold pressure`\n            SendButton(BUTTON_TOPIC)\n        } else if (Data.startsWith(\"*25*25#\")) {\n            //il pulsante è stato ruotato lentamente in senso orario\n            result_data = BUTTON_SLOW_RIGHT\n            debug_text = `${where_table} ${BUTTON_NUMBER} with address ${where} has slowly turned clockwise`\n            SendButton(BUTTON_TOPIC)\n        } else if (Data.startsWith(\"*25*26#\")) {\n            //il pulsante è stato ruotato velocemente in senso orario\n            result_data = BUTTON_QUICK_RIGHT\n            debug_text = `${where_table} ${BUTTON_NUMBER} with address ${where} has quickly turned clockwise`\n            SendButton(BUTTON_TOPIC)\n        } else if (Data.startsWith(\"*25*27#\")) {\n            //il pulsante è stato ruotato lentamente in senso antiorario\n            result_data = BUTTON_SLOW_LEFT\n            debug_text = `${where_table} ${BUTTON_NUMBER} with address ${where} has slowly turned counterclockwise`\n            SendButton(BUTTON_TOPIC)\n        } else if (Data.startsWith(\"*25*28#\")) {\n            //il pulsante è stato ruotato velocemente in senso antiorario\n            result_data = BUTTON_QUICK_LEFT\n            debug_text = `${where_table} ${BUTTON_NUMBER} with address ${where} has quickly turned counterclockwise`\n            SendButton(BUTTON_TOPIC)\n        } else {\n            result_data = UNDEFINED\n            debug_text = `Unknown ${who_func} for event ${Data}`\n        }\n\n        return null\n    }\n\n    //not implemented functions\n    switch (who) {\n        case 0:\n            //descrizione della funzione\n            who_func = \"Scene Functions\"\n            //nome oggetto della funzione\n            who_name = \"Scene\"\n            where_table = GetWhereTable()\n            result_data = LIGHT_ON\n            debug_text = `${who_func} not implemented | ${Data}`\n            break\n        case 3:\n            //descrizione della funzione\n            who_func = \"Load Controls Functions\"\n            //nome oggetto della funzione\n            who_name = \"Load\"\n            where_table = GetWhereTable()\n            result_data = UNDEFINED\n            debug_text = `${who_func} not implemented | ${Data}`\n            break\n        case 5:\n            //descrizione della funzione\n            who_func = \"Bunglar Alarm Functions\"\n            //nome oggetto della funzione\n            who_name = \"Alarm\"\n            where_table = GetWhereTable()\n            result_data = UNDEFINED\n            debug_text = `${who_func} not implemented | ${Data}`\n            break\n        case 6:\n            //descrizione della funzione\n            who_func = \"Video Door Entry System Functions\"\n            //nome oggetto della funzione\n            who_name = \"Video Door\"\n            where_table = GetWhereTable()\n            result_data = UNDEFINED\n            debug_text = `${who_func} not implemented | ${Data}`\n            break\n        case 7:\n            //descrizione della funzione\n            who_func = \"Video Door Entry System Functions\"\n            //nome oggetto della funzione\n            who_name = \"Video Door\"\n            where_table = GetWhereTable()\n            result_data = UNDEFINED\n            debug_text = `${who_func} not implemented | ${Data}`\n            break\n        case 14:\n            //descrizione della funzione\n            who_func = \"Light Special Functions\"\n            //nome oggetto della funzione\n            who_name = \"Light\"\n            what = (frame[1] == \"0\") ? 0 : 1\n            where = frame[2]\n            where_table = GetWhereTable()\n            result_data = (what == 1) ? false : true\n            debug_text = `${where_table} ${where} disable mode is ${result_data}`\n            break\n        case 16:\n            //descrizione della funzione\n            who_func = \"Sound Diffusion Functions\"\n            //nome oggetto della funzione\n            who_name = \"Sound\"\n            where_table = GetWhereTable()\n            result_data = UNDEFINED\n            debug_text = `${who_func} not implemented | ${Data}`\n            break\n        case 18:\n            //descrizione della funzione\n            who_func = \"Energy Management Functions\"\n            //nome oggetto della funzione\n            who_name = \"Energy\"\n            where_table = GetWhereTable()\n            result_data = UNDEFINED\n            debug_text = `${who_func} not implemented | ${Data}`\n            break\n        case 22:\n            //descrizione della funzione\n            who_func = \"Sound Diffusion Functions\"\n            //nome oggetto della funzione\n            who_name = \"Sound\"\n            where_table = GetWhereTable()\n            result_data = UNDEFINED\n            debug_text = `${who_func} not implemented | ${Data}`\n            break\n        case 24:\n            //descrizione della funzione\n            who_func = \"Light Management Functions\"\n            //nome oggetto della funzione\n            who_name = \"Light Management\"\n            where_table = GetWhereTable()\n            result_data = UNDEFINED\n            debug_text = `${who_func} not implemented | ${Data}`\n            break\n    }\n\n    //finally\n    if (who) {\n        if (Data.substr(0, 5) == \"*1001\") {\n            //descrizione della funzione\n            who_func = \"Automation Diagnostic Functions\"\n            //nome oggetto della funzione\n            who_name = \"Diagnostic\"\n            where_table = GetWhereTable()\n            result_data = UNDEFINED\n            debug_text = `${who_func} not implemented | ${Data}`\n        } else if (Data.substr(0, 5) == \"*1004\") {\n            //descrizione della funzione\n            who_func = \"Thermoregulation Diagnostic Functions\"\n            //nome oggetto della funzione\n            who_name = \"Diagnostic\"\n            where_table = GetWhereTable()\n            result_data = UNDEFINED\n            debug_text = `${who_func} not implemented | ${Data}`\n        } else if (Data.substr(0, 5) == \"*1013\") {\n            //descrizione della funzione\n            who_func = \"Device Diagnostic Functions\"\n            //nome oggetto della funzione\n            who_name = \"Diagnostic\"\n            where_table = GetWhereTable()\n            result_data = UNDEFINED\n            debug_text = `${who_func} not implemented | ${Data}`\n        }\n    } else {\n        result_data = UNDEFINED\n\n        if (Data == ACK) {\n            debug_text = \"ACK\"\n        } else if (Data == NACK) {\n            debug_text = \"NACK\"\n        } else {\n            debug_text = `Invalid Event Frame: ${Data}`\n        }\n    }\n}\n\n////////////////////////////////////////////////////////////////////////\n//OUTPUT////////////////////////////////////////////////////////////////\n////////////////////////////////////////////////////////////////////////\n\n//assegno i dati\nData = msg.payload || null\n\n//converte il buffer in stringa utf8\nif (Buffer.isBuffer(msg.payload)) msg.payload = msg.payload.toString()\n\n//converte il buffer in stringa utf8\nif (Data && Buffer.isBuffer(Data)) Data = Data.toString()\n\n//processa l'evento\nif (Data) ProcessEvent()\n\n//finalizzazione\nif (who && result_data && result_data != UNDEFINED) {\n    //il payload è stato gestito\n    node.status({ fill: \"green\", shape: \"dot\", text: debug_text })\n    if (env.get(\"debug_log\")) { node.log(debug_text) }\n} else if (who && !result_data) {\n    //il payload non è stato gestito dal processo\n    debug_text = `Unknown event ${Data} for who ${who}`\n    node.status({ fill: \"red\", shape: \"ring\", text: debug_text })\n    if (env.get(\"debug_warn\")) { node.warn(debug_text) }\n} else {\n    //evento sconosciuto\n    debug_text = debug_text || `Unknown event ${Data}`\n    node.status({ fill: \"yellow\", shape: \"ring\", text: debug_text })\n    if (env.get(\"debug_warn\")) { node.warn(debug_text) }\n}\n\nreturn null",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "// Code added here will be run once\n// whenever the node is started.\nflow.set(\"manufacturer\", \"BTicino MyHome\")\nflow.set(\"powered_by\", \"Bruno Leonardi © 2021\")\nnode.status({ fill: \"blue\", shape: \"ring\", text: \"Initialized\" })",
+        "finalize": "",
+        "libs": [],
+        "x": 500,
+        "y": 140,
+        "wires": [
+            [
+                "2cd0a70b91ab3418",
+                "505197735eb78414"
+            ]
+        ],
+        "inputLabels": [
+            "Event"
+        ],
+        "outputLabels": [
+            "Event"
+        ],
+        "icon": "font-awesome/fa-gears"
+    },
+    {
+        "id": "11e8f8f84255cff0",
+        "type": "trigger",
+        "z": "2a4b09836ccc0a58",
+        "name": "Reset status node",
+        "op1": "",
+        "op2": "true",
+        "op1type": "nul",
+        "op2type": "bool",
+        "duration": "10",
+        "extend": true,
+        "overrideDelay": false,
+        "units": "s",
+        "reset": "",
+        "bytopic": "all",
+        "topic": "topic",
+        "outputs": 1,
+        "x": 270,
+        "y": 140,
+        "wires": [
+            [
+                "20963ea372783d75"
+            ]
+        ]
+    },
+    {
+        "id": "2cd0a70b91ab3418",
+        "type": "trigger",
+        "z": "2a4b09836ccc0a58",
+        "name": "Timeout connection",
+        "op1": "",
+        "op2": "OFF",
+        "op1type": "nul",
+        "op2type": "str",
+        "duration": "5",
+        "extend": true,
+        "overrideDelay": false,
+        "units": "min",
+        "reset": "",
+        "bytopic": "all",
+        "topic": "topic",
+        "outputs": 1,
+        "x": 270,
+        "y": 190,
+        "wires": [
+            [
+                "505197735eb78414"
+            ]
+        ]
+    },
+    {
+        "id": "505197735eb78414",
+        "type": "function",
+        "z": "2a4b09836ccc0a58",
+        "name": "Connection status",
+        "func": "var STATE = (msg.payload == \"OFF\") ? \"OFF\" : \"ON\"\n\n//powered by\nvar MANUFACTURER = flow.get(\"manufacturer\")\nvar POWERED_BY = flow.get(\"powered_by\")\n\nif (STATE == \"OFF\") {\n    node.status({fill:\"red\", shape:\"dot\", text:\"Disconnected\"})\n}\n\nif (msg.topic != null && msg.topic != \"gateway/myhome/status\") {\n    msg.payload = {}\n    msg.payload.gateway = {}\n    msg.payload.gateway.state = STATE\n    msg.payload.attributes = {}\n    msg.payload.attributes.manufacturer = MANUFACTURER\n    msg.payload.attributes.powered_by = POWERED_BY\n    msg.payload.attributes.function = \"Connection watchdog\"\n    //conversione payload a JSON String\n    msg.payload = JSON.stringify(msg.payload)\n}\n\n//impostazioni MQTT\nmsg.qos = 0\nmsg.retain = true\nmsg.topic = \"connection/myhome/status\"\n\nreturn msg",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 710,
+        "y": 190,
+        "wires": [
+            [
+                "a99e6b4802479714"
+            ]
+        ]
+    },
+    {
+        "id": "a99e6b4802479714",
+        "type": "delay",
+        "z": "2a4b09836ccc0a58",
+        "name": "",
+        "pauseType": "rate",
+        "timeout": "5",
+        "timeoutUnits": "seconds",
+        "rate": "1",
+        "nbRateUnits": "1",
+        "rateUnits": "minute",
+        "randomFirst": "1",
+        "randomLast": "5",
+        "randomUnits": "seconds",
+        "drop": true,
+        "allowrate": false,
+        "outputs": 1,
+        "x": 855,
+        "y": 190,
+        "wires": [
+            []
+        ],
+        "l": false
+    },
+    {
+        "id": "ccc1ef91dc8782e5",
+        "type": "function",
+        "z": "2a4b09836ccc0a58",
+        "name": "OWN Command",
+        "func": "// AGGIORNATO IL 06/01/2023\n////////////////////////////////////////////////////////////////////////\n////////////////////////////////////////////////////////////////////////\n////////////////////////////////////////////////////////////////////////\n\n//messaggi obbligatori\nif (msg.topic === undefined || msg.topic === null) return null\nif (msg.payload === undefined || msg.payload === null) return null\n\n////////////////////////////////////////////////////////////////////////\n////////////////////////////////////////////////////////////////////////\n////////////////////////////////////////////////////////////////////////\n\nconst TOPIC_SYNC = msg.topic.endsWith(\"/myhome/sync\")\nconst TOPIC_LIGHT = msg.topic.endsWith(\"/light/myhome/set\")\nconst TOPIC_BRIGHTNESS = msg.topic.endsWith(\"/brightness/myhome/set\")\nconst TOPIC_COVER = msg.topic.endsWith(\"/cover/myhome/set\")\n\n////////////////////////////////////////////////////////////////////////\n////////////////////////////////////////////////////////////////////////\n////////////////////////////////////////////////////////////////////////\n\nconst INTERFACE = \"#4#\"\nvar Payload = msg.payload\nvar Topic = msg.topic\nvar where = null\nvar what = null\nvar bus = null\nvar output = null\n\n////////////////////////////////////////////////////////////////////////\n////////////////////////////////////////////////////////////////////////\n////////////////////////////////////////////////////////////////////////\n//FUNCTIONS\n\nfunction SetSync() {\n    // *#{what}*{where}##\n    Topic = Topic.split(\"/\")\n    where = Topic[0]\n    bus = Topic[1]\n    what = Topic[2] || '1'\n\n    if (where) {\n        where += (bus != \"00\") ? `${INTERFACE + bus}##` : \"\"\n        return `*#${what}*${where}##`\n    } else {\n        return null\n    }\n}\n\nfunction SetLight() {\n    // on/off command *1*{what}*{where}##\n    Topic = Topic.split(\"/\")\n    where = Topic[0]\n    bus = Topic[1]\n    what = parseInt(Topic[2])\n\n    if (Payload == \"ON\") {\n        if (what >= 11 && what <= 18) {\n            //delay command *1*{11-18}*{where}##\n            // 11 = 1 minuto\n            // 12 = 2 minuti\n            // 13 = 3 minuti\n            // 14 = 4 minuti\n            // 15 = 5 minuti\n            // 16 = 15 minuti\n            // 17 = 30 secondi\n            // 18 = 0.5 secondi\n            what = what\n        } else if (what >= 20 && what <= 29) {\n            //blink command *1*{20-29}*{where}##\n            // 20 = 0.5 secondi\n            // 21 = 1 secondo\n            // 22 = 1.5 secondi\n            // 23 = 2 secondi\n            // 24 = 2.5 secondi\n            // 25 = 3 secondi\n            // 26 = 3.5 secondi\n            // 27 = 4 secondi\n            // 28 = 4.5 secondi\n            // 29 = 5 secondi\n            what = what\n        } else {\n            //on command *1*1*{where}##\n            what = 1\n        }\n    } else if (Payload == \"OFF\") {\n        //off command *1*0*{where}##\n        what = 0\n    } else {\n        return null\n    }\n\n    if (where) {\n        where += (bus != \"00\") ? `${INTERFACE + bus}` : \"\"\n        return `*1*${what}*${where}##`\n    } else {\n        return null\n    }\n}\n\nfunction SetBrightness() {\n    // dimmer command *#1*{where}*#1*{command_level}*{transition_speed}##\n    Topic = Topic.split(\"/\")\n    where = Topic[0]\n    bus = Topic[1]\n\n    if (where) {\n        where += (bus != \"00\") ? INTERFACE + bus : \"\"\n        Payload = Math.round(parseInt(Payload) / 2.55) + 100\n        return (Payload <= 100) ? `*1*0*${where}##` : `*#1*${where}*#1*${Payload}*0##`\n    } else {\n        return null\n    }\n}\n\nfunction SetCover() {\n    //cover command *2*{stop_open_close}*{where}##\n    Topic = Topic.split(\"/\")\n    where = Topic[0]\n    bus = Topic[1]\n\n    if (Payload == \"STOP\" || Payload == \"stop\") {\n        what = 0\n    } else if (Payload == \"OPEN\" || Payload == \"open\") {\n        what = 1\n    } else if (Payload == \"CLOSE\" || Payload == \"close\") {\n        what = 2\n    } else {\n        return null\n    }\n\n    if (where) {\n        where += (bus != \"00\") ? `${INTERFACE + bus}` : \"\"\n        return `*2*${what}*${where}##`\n    } else {\n        return null\n    }\n}\n\n////////////////////////////////////////////////////////////////////////\n////////////////////////////////////////////////////////////////////////\n////////////////////////////////////////////////////////////////////////\n//OUTPUT\n\nif (TOPIC_SYNC) {\n    output = SetSync()\n} else if (TOPIC_LIGHT) {\n    output = SetLight()\n} else if (TOPIC_BRIGHTNESS) {\n    output = SetBrightness()\n} else if (TOPIC_COVER) {\n    output = SetCover()\n} else {\n    node.status({ fill: \"red\", shape: \"dot\", text: \"The command is not valid\" })\n}\n\nif (output) {\n    //debug log\n    if (env.get(\"debug_log\")) { node.log(output) }\n    //invia il messaggio\n    return { payload: output }\n} else {\n    //debug log\n    if (env.get(\"debug_log\")) { node.log(\"The command is not valid: \" + Topic + Payload) }\n    return null\n}",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 490,
+        "y": 90,
+        "wires": [
+            []
+        ],
+        "inputLabels": [
+            "OWN Event Session"
+        ],
+        "outputLabels": [
+            "Output"
+        ],
+        "icon": "font-awesome/fa-gears"
+    },
+    {
+        "id": "07c351eaa2415321",
+        "type": "function",
+        "z": "2a4b09836ccc0a58",
+        "name": "Switch MyHome and MQTT",
+        "func": "if (msg.topic) {\n    if (msg.topic.search(/status/gi) !== -1) return null\n    if (msg.topic.search(/myhome/gi) === -1) return null\n    return [msg, null]\n} else {\n    return [null, msg]\n}",
+        "outputs": 2,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 240,
+        "y": 90,
+        "wires": [
+            [
+                "ccc1ef91dc8782e5"
+            ],
+            [
+                "20963ea372783d75"
+            ]
+        ]
+    },
+    {
+        "id": "0fdc108e1120604a",
+        "type": "inject",
+        "z": "2a4b09836ccc0a58",
+        "name": "Watchdog",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "60",
+        "crontab": "",
+        "once": true,
+        "onceDelay": "10",
+        "topic": "",
+        "payload": "*#13**15##",
+        "payloadType": "str",
+        "x": 290,
+        "y": 40,
+        "wires": [
+            [
+                "1d620609b543933e"
+            ]
+        ]
+    },
+    {
+        "id": "1d620609b543933e",
+        "type": "function",
+        "z": "2a4b09836ccc0a58",
+        "name": "Watchdog",
+        "func": "if (env.get(\"watchdog\")) return msg",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 740,
+        "y": 40,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "abcc0fda3dce3b7d",
+        "type": "delay",
+        "z": "2a4b09836ccc0a58",
+        "name": "",
+        "pauseType": "rate",
+        "timeout": "5",
+        "timeoutUnits": "seconds",
+        "rate": "6",
+        "nbRateUnits": "1",
+        "rateUnits": "second",
+        "randomFirst": "1",
+        "randomLast": "5",
+        "randomUnits": "seconds",
+        "drop": false,
+        "allowrate": false,
+        "outputs": 1,
+        "x": 855,
+        "y": 290,
+        "wires": [
+            []
+        ],
+        "l": false
+    },
+    {
+        "id": "ee4ce6ce0a3e69ed",
+        "type": "catch",
+        "z": "2a4b09836ccc0a58",
+        "name": "",
+        "scope": [
+            "ccc1ef91dc8782e5",
+            "20963ea372783d75"
+        ],
+        "uncaught": false,
+        "x": 500,
+        "y": 240,
+        "wires": [
+            [
+                "ad281a1b4f7d575a"
+            ]
+        ]
+    },
+    {
+        "id": "ad281a1b4f7d575a",
+        "type": "function",
+        "z": "2a4b09836ccc0a58",
+        "name": "Node error",
+        "func": "node.error(msg.error, msg)",
+        "outputs": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 730,
+        "y": 240,
+        "wires": []
+    },
+    {
+        "id": "83e7e23bcb0e05c0",
+        "type": "subflow:2a4b09836ccc0a58",
+        "z": "cfd7d192.abaa1",
+        "name": "",
+        "x": 270,
+        "y": 130,
+        "wires": [
+            [
+                "8f269855.18e9a8"
+            ],
+            [
+                "6797686b.108b38"
+            ]
+        ]
+    }
+]
